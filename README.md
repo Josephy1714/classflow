@@ -2,24 +2,19 @@
 
 **Your entire academic life, organized in one place.**
 
-A mobile-first academic workspace built with React and Vite. The current MVP stores student data locally in the browser; cloud accounts and synchronization are intentionally deferred.
+CLASSFLOW is a mobile-first academic timetable and semester workspace built with React and Vite. The current MVP is designed for students worldwide and stores academic records locally in the browser.
 
-## Included
-- Overview dashboard, seven-day weekly timetable, units, assignments, examinations and attendance.
-- Editable class sessions (unit, day, type, start/end time and venue), with overlap detection and delete controls.
-- Attendance confirmation with four absence reasons; absence reason is stored separately from attendance status.
+## Current features
+- Overview dashboard with semester counts and upcoming classes.
+- Seven-day timetable (Monday–Sunday), including session creation, editing and deletion.
+- Automatic overlap detection for classes scheduled at the same time.
+- Unit management and assignment tracking.
+- Attendance page for recording present/absent status.
 - Timetable import for CSV, XLS/XLSX, ODS, ODT, PDF, PNG, JPG/JPEG and WEBP.
 - PDF text extraction with scanned-PDF OCR fallback; image OCR uses Tesseract.js in the browser.
-- Extracted timetable rows are heuristically recognized and should be checked by the student. Unusual layouts may need manual correction.
-- Local browser persistence and JSON backup/restore.
-- Installable PWA foundation, service worker notification click handling and Web Push event receiver.
-- In-app scheduled attendance prompts while the app is open; browser notifications when permission is granted.
-
-## Current MVP notes
-- The timetable displays Monday through Sunday on desktop and a responsive seven-day grid on mobile.
-- Imported sessions open in a review step before they are saved.
-- The starter workspace contains sample data; replace it with your own details in Workspace settings and the timetable before relying on it.
-- This is an MVP, not a finished production SaaS. Dependencies/build have not yet been verified in this environment.
+- Import review screen: edit detected unit, day, times and venue or remove rows before importing.
+- JSON backup export and restore.
+- Installable PWA foundation and service-worker receiver for Web Push notifications.
 
 ## Run locally
 ```bash
@@ -27,14 +22,19 @@ npm install
 npm run dev
 ```
 
-## Production build
+## Build
 ```bash
 npm run build
 npm run preview
 ```
 
-## Notification delivery: important limitation
-The service worker can display Web Push messages and handle notification clicks. The app can schedule attendance reminders while its page is running. **A service worker cannot reliably wake itself at an arbitrary future class-end time when the browser is closed.** True closed-browser automated delivery requires a push sender (for example, a Vercel serverless function with VAPID keys), a persistent subscription store and a scheduler/cron service. Those credentials and a persistent backend are not available in this repository yet, so closed-browser delivery is not represented as complete. Browser/OS settings also control external notification sound behavior.
+GitHub Actions runs the production build on pushes and pull requests to `main`.
 
-## Data and privacy
-All academic records currently remain in the browser's local storage. Clearing browser data can remove them; export a JSON backup regularly. OCR runs client-side. Cloud accounts and cross-device synchronization are out of scope for this first iteration.
+## Important limitations
+- Timetable extraction is heuristic. Always review the imported rows; unusual layouts may need manual entry.
+- Academic records are stored in browser local storage. Clearing browser data can remove them; export a JSON backup regularly.
+- The service worker can display incoming Web Push messages, but the project does not yet include a push sender, subscription database, VAPID secrets or scheduler. It therefore does not promise reminders while the browser is closed.
+- This is an MVP, not a finished production SaaS. Authentication, cloud sync, automated closed-browser reminders and a full exam workflow remain future work.
+
+## Privacy
+OCR runs client-side in the browser. No academic data is sent to a CLASSFLOW backend in this MVP.
