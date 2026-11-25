@@ -111,3 +111,33 @@ test('detects sessions in the uploaded real timetable grid geometry',()=>{
     [4,'09:00','12:00','SDS 3203']
   ]);
 });
+
+
+test('UoN timetable PDF raster OCR recovers the same 11 sessions as its image',()=>{
+  const pdf=new URL('../test-fixtures/timetable.pdf',import.meta.url);
+  const prefix='/tmp/classflow-uon-pdf';
+  execFileSync('pdftoppm',['-f','1','-l','1','-jpeg','-r','180',pdf.pathname,prefix],{maxBuffer:16*1024*1024});
+  const raster=prefix+'-1.jpg';
+  const decoded=jpeg.decode(fs.readFileSync(raster),{useTArray:true});
+  const readWords=(base,args=[])=>{
+    execFileSync('tesseract',[raster,base,'tsv',...args],{maxBuffer:16*1024*1024});
+    return fs.readFileSync(base+'.tsv','utf8').split(/\\r?\\n/).slice(1).flatMap(line=>{
+      const c=line.split('\\t');
+      if(c.length<12||c[0]!=='5'||!c[11]?.trim())return [];
+      const x=Number(c[6]),y=Number(c[7]),w=Number(c[8]),h=Number(c[9]);
+      return [{text:c[11],confidence:Number(c[10]),bbox:{x0:x,y0:y,x1:x+w,y1:y+h}}];
+    });
+  };
+  const standard=readWords('/tmp/classflow-uon-pdf-standard');
+  const enhanced=readWords('/tmp/classflow-uon-pdf-enhanced',['--psm','11']);
+  const isAnchor=word=>Boolean(inferWeekday(word.text))||/\\d{1,2}[:.]\\d{2}/i.test(word.text)||/^(am|pm|noon|midnight)$/i.test(word.text.trim());
+  const anchors=standard.filter(isAnchor);
+  const body=[...enhanced.filter(w=>!isAnchor(w)),...standard.filter(w=>!isAnchor(w))];
+  const rows=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words:body,anchorWords:anchors});
+  assert.equal(rows.length,11,JSON.stringify({width:decoded.width,height:decoded.height,anchors,rows},null,2));
+  assert.deepEqual(rows.map(r=>[r.day,r.start,r.end]).sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1])),[
+    [0,'08:00','10:00'],[0,'10:00','12:00'],[0,'13:00','14:00'],
+    [1,'08:00','10:00'],[1,'10:00','11:00'],[1,'13:00','14:00'],[1,'15:00','17:00'],
+    [2,'08:00','10:00'],[3,'10:00','11:00'],[3,'13:00','14:00'],[4,'09:00','12:00']
+  ]);
+});
