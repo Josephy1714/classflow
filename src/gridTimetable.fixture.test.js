@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import jpeg from 'jpeg-js';
-import {parseGridTimetable} from './gridTimetable.js';
+import {parseGridTimetable,detectGrid} from './gridTimetable.js';
 
 test('detects sessions in the uploaded real timetable grid geometry',()=>{
   const bytes=fs.readFileSync(new URL('../test-fixtures/IMG-20260906-WA0006(4).jpg',import.meta.url));
@@ -38,8 +38,9 @@ test('detects sessions in the uploaded real timetable grid geometry',()=>{
   cell(3,726,'SMA 3201A Lec 1a','MH II','Dr Imagiri S K');
   cell(1,960,'STA 3201B Lec 1','MH I',"Mrs Wang'ombe A W");
   cell(4,257,'SDS 3203 Lec 1','SYNC ONLINE');
+  const grid=detectGrid(decoded.data,decoded.width,decoded.height);
   const rows=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words});
-  assert.equal(rows.length,11,JSON.stringify(rows,null,2));
+  assert.equal(rows.length,11,JSON.stringify({grid,rows},null,2));
   assert.deepEqual(rows.map(r=>[r.day,r.start,r.end,r.code]).sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1])),[
     [0,'08:00','10:00','SMA 3250'],
     [0,'10:00','12:00','SMA 3203A'],
