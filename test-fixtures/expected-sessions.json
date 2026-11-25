@@ -1,0 +1,105 @@
+{
+  "source": "IMG-20260906-WA0006(4).jpg",
+  "notes": "Manually transcribed from the uploaded timetable image. Use as a ground-truth comparison when validating OCR output.",
+  "sessions": [
+    {
+      "day": "Monday",
+      "start": "08:00",
+      "end": "10:00",
+      "code": "SMA 3250",
+      "title": "SMA 3250 Lec 1",
+      "venue": "SYNC ONLINE",
+      "lecturer": "Dr Rao, W O"
+    },
+    {
+      "day": "Monday",
+      "start": "10:00",
+      "end": "12:00",
+      "code": "SMA 3203A",
+      "title": "SMA 3203A Lec 1",
+      "venue": "MH II",
+      "lecturer": "Dr Wafula, A W"
+    },
+    {
+      "day": "Monday",
+      "start": "13:00",
+      "end": "14:00",
+      "code": "SMA 3203A",
+      "title": "SMA 3203A Lec 1a",
+      "venue": "MH II",
+      "lecturer": "Dr Wafula, A W"
+    },
+    {
+      "day": "Tuesday",
+      "start": "08:00",
+      "end": "10:00",
+      "code": "SDS 3201",
+      "title": "SDS 3201 Lec 1",
+      "venue": "SOB II",
+      "lecturer": ""
+    },
+    {
+      "day": "Tuesday",
+      "start": "10:00",
+      "end": "11:00",
+      "code": "SMA 3250",
+      "title": "SMA 3250 Lec 1a",
+      "venue": "SJT",
+      "lecturer": "Dr Rao, W O"
+    },
+    {
+      "day": "Tuesday",
+      "start": "13:00",
+      "end": "14:00",
+      "code": "STA 3201B",
+      "title": "STA 3201B Lec 1a",
+      "venue": "SYNC ONLINE",
+      "lecturer": "Mrs Wang'ombe, A W"
+    },
+    {
+      "day": "Tuesday",
+      "start": "15:00",
+      "end": "17:00",
+      "code": "STA 3201B",
+      "title": "STA 3201B Lec 1",
+      "venue": "MH I",
+      "lecturer": "Mrs Wang'ombe, A W"
+    },
+    {
+      "day": "Wednesday",
+      "start": "08:00",
+      "end": "10:00",
+      "code": "SMA 3201A",
+      "title": "SMA 3201A Lec 1",
+      "venue": "MH I",
+      "lecturer": "Dr Imagiri, S K"
+    },
+    {
+      "day": "Thursday",
+      "start": "10:00",
+      "end": "11:00",
+      "code": "SDS 3201",
+      "title": "SDS 3201 Lec 1a",
+      "venue": "SPS G39",
+      "lecturer": ""
+    },
+    {
+      "day": "Thursday",
+      "start": "13:00",
+      "end": "14:00",
+      "code": "SMA 3201A",
+      "title": "SMA 3201A Lec 1a",
+      "venue": "MH II",
+      "lecturer": "Dr Imagiri, S K"
+    },
+    {
+      "day": "Friday",
+      "start": "09:00",
+      "end": "12:00",
+      "code": "SDS 3203",
+      "title": "SDS 3203 Lec 1",
+      "venue": "SYNC ONLINE",
+      "lecturer": ""
+    }
+  ]
+}
