@@ -144,14 +144,15 @@ function makeSession(day,start,end,lines) {
   return {day:DAYS.indexOf(day),code,name:title,start:asTime(start),end:asTime(end),venue,type:/tutorial/i.test(title)?'Tutorial':/prac/i.test(title)?'Practical':'Lecture',confidence:courseIndex>=0?'review':'low'};
 }
 
-export function parseGridTimetable({imageData,width,height,words,debug=false}) {
+export function parseGridTimetable({imageData,width,height,words,anchorWords,debug=false}) {
   const data=imageData?.data||imageData;
   if(!data||!width||!height)return [];
   const grid=detectGrid(data,width,height);
   if(!grid)return [];
   const lines=lineGroups(words);
-  if(!lines.length)return [];
-  const dayHeaders=lines.flatMap(line=>line.words.flatMap(word=>{
+  const anchorLines=lineGroups(anchorWords||words);
+  if(!lines.length||!anchorLines.length)return [];
+  const dayHeaders=anchorLines.flatMap(line=>line.words.flatMap(word=>{
     const day=inferWeekday(word.text);
     return day?[{day,x:word.x,y:word.y}]:[];
   }));
@@ -161,7 +162,7 @@ export function parseGridTimetable({imageData,width,height,words,debug=false}) {
     return index>=1&&index<grid.vertical.length-1?{...mark,left:grid.vertical[index],right:grid.vertical[index+1]}:null;
   }).filter(Boolean);
   const rawAnchors=[];
-  for(const line of lines){
+  for(const line of anchorLines){
     if(!line.words.some(w=>w.x<grid.vertical[1]))continue;
     const minutes=clockMinutes(line.text);
     if(minutes===null)continue;
@@ -171,7 +172,7 @@ export function parseGridTimetable({imageData,width,height,words,debug=false}) {
   // OCR time labels sit just below their corresponding horizontal boundary.
   // Use their own baselines as anchors and reconstruct missing half-hour rules
   // between hourly labels (merged cells can erase those rules in the day area).
-  const fontHeight=median(lines.flatMap(line=>line.words.map(w=>w.h)));
+  const fontHeight=median(anchorLines.flatMap(line=>line.words.map(w=>w.h)));
   const anchored=rawAnchors.map(a=>({...a,y:a.y-fontHeight}));
   const gaps=grid.horizontal.slice(1).map((y,i)=>y-grid.horizontal[i]).filter(d=>d>=20&&d<=110);
   const slotHeight=median(gaps);
