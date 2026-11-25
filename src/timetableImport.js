@@ -22,9 +22,17 @@ function parseTimePair(text) {
   return values.length>=2 ? [values[0],values[1]] : null;
 }
 function inferDay(text) {
-  const t=normalize(text).replace(/[^a-z]/g,'');
-  const aliases={mon:'Monday',monday:'Monday',tue:'Tuesday',tues:'Tuesday',tuesday:'Tuesday',wed:'Wednesday',weds:'Wednesday',wednesday:'Wednesday',thu:'Thursday',thur:'Thursday',thurs:'Thursday',thursday:'Thursday',fri:'Friday',friday:'Friday',sat:'Saturday',saturday:'Saturday',sun:'Sunday',sunday:'Sunday'};
-  return aliases[t]||null;
+  const t=normalize(text);
+  const match=t.match(/\\b(mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday|rsday)?|thursday|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\\b/i);
+  if(!match)return null;
+  const key=match[1].toLowerCase();
+  if(key.startsWith('mon'))return 'Monday';
+  if(key.startsWith('tue'))return 'Tuesday';
+  if(key.startsWith('wed'))return 'Wednesday';
+  if(key.startsWith('thu'))return 'Thursday';
+  if(key.startsWith('fri'))return 'Friday';
+  if(key.startsWith('sat'))return 'Saturday';
+  return 'Sunday';
 }
 function cleanCell(value) {
   return String(value??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim();
