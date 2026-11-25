@@ -10,7 +10,7 @@ test('OCR reads the uploaded timetable and recovers its 11 class blocks',()=>{
   const file=new URL('../test-fixtures/IMG-20260906-WA0006(4).jpg',import.meta.url);
   const decoded=jpeg.decode(fs.readFileSync(file),{useTArray:true});
   const outputBase='/tmp/classflow-timetable-ocr';
-  execFileSync('tesseract',[file.pathname,outputBase,'tsv'],{maxBuffer:8*1024*1024});
+  execFileSync('tesseract',[file.pathname,outputBase,'--psm','6','tsv'],{maxBuffer:8*1024*1024});
   const tsv=fs.readFileSync(outputBase+'.tsv','utf8');
   const words=tsv.split(/\r?\n/).slice(1).flatMap(line=>{
     const c=line.split('\t');
