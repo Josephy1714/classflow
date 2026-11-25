@@ -61,7 +61,7 @@ function detectGrid(data,width,height) {
   const rowScores=[], colScores=[];
   for(let y=0;y<height;y++){
     let dark=0;
-    for(let x=0;x<width;x++){const i=(y*width+x)*4;if((data[i]+data[i+1]+data[i+2])/3<145)dark++;}
+    for(let x=0;x<width;x++){const i=(y*width+x)*4;if((data[i]+data[i+1]+data[i+2])/3<205)dark++;}
     rowScores.push(dark/width);
   }
   let horizontal=clusterPositions(rowScores.map((v,i)=>v>0.48?i:null).filter(v=>v!==null),3);
@@ -69,18 +69,18 @@ function detectGrid(data,width,height) {
   const top=horizontal[0],bottom=horizontal[horizontal.length-1];
   for(let x=0;x<width;x++){
     let dark=0;
-    for(let y=top;y<=bottom;y++){const i=(y*width+x)*4;if((data[i]+data[i+1]+data[i+2])/3<145)dark++;}
+    for(let y=top;y<=bottom;y++){const i=(y*width+x)*4;if((data[i]+data[i+1]+data[i+2])/3<205)dark++;}
     colScores.push(dark/(bottom-top+1));
   }
   let vertical=clusterPositions(colScores.map((v,i)=>v>0.55?i:null).filter(v=>v!==null),3);
   if(vertical.length<4)return null;
   const left=vertical[0],right=vertical[vertical.length-1];
   horizontal=clusterPositions(rowScores.map((v,i)=>{
-    let dark=0;for(let x=left;x<=right;x++){const p=(i*width+x)*4;if((data[p]+data[p+1]+data[p+2])/3<145)dark++;}
+    let dark=0;for(let x=left;x<=right;x++){const p=(i*width+x)*4;if((data[p]+data[p+1]+data[p+2])/3<205)dark++;}
     return dark/(right-left+1)>0.58?i:null;
   }).filter(v=>v!==null),3);
   vertical=clusterPositions(colScores.map((v,i)=>{
-    let dark=0;for(let y=horizontal[0];y<=horizontal[horizontal.length-1];y++){const p=(y*width+i)*4;if((data[p]+data[p+1]+data[p+2])/3<145)dark++;}
+    let dark=0;for(let y=horizontal[0];y<=horizontal[horizontal.length-1];y++){const p=(y*width+i)*4;if((data[p]+data[p+1]+data[p+2])/3<205)dark++;}
     return dark/(horizontal[horizontal.length-1]-horizontal[0]+1)>0.55?i:null;
   }).filter(v=>v!==null),3);
   return horizontal.length>=3&&vertical.length>=4?{horizontal,vertical}:null;
