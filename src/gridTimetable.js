@@ -144,7 +144,7 @@ function makeSession(day,start,end,lines) {
   return {day:DAYS.indexOf(day),code,name:title,start:asTime(start),end:asTime(end),venue,type:/tutorial/i.test(title)?'Tutorial':/prac/i.test(title)?'Practical':'Lecture',confidence:courseIndex>=0?'review':'low'};
 }
 
-export function parseGridTimetable({imageData,width,height,words,anchorWords,debug=false}) {
+export function parseGridTimetable({imageData,width,height,words,anchorWords}) {
   const data=imageData?.data||imageData;
   if(!data||!width||!height)return [];
   const grid=detectGrid(data,width,height);
@@ -191,7 +191,7 @@ export function parseGridTimetable({imageData,width,height,words,anchorWords,deb
   }));
   const boundaryTimes=interpolateAnchors(boundaries,timeAnchors);
   if(!boundaryTimes)return [];
-  const results=[],slotDiagnostics=[];
+  const results=[];
   for(const column of dayColumns){
     const slots=[];
     for(let r=0;r<boundaries.length-1;r++){
@@ -203,7 +203,6 @@ export function parseGridTimetable({imageData,width,height,words,anchorWords,deb
       const header=median(headerSamples)<218;
       slots.push({occupied,header,top,bottom,start:boundaryTimes[r],end:boundaryTimes[r+1]});
     }
-    slotDiagnostics.push({day:column.day,left:column.left,right:column.right,slots:slots.map(({occupied,header,top,bottom,start,end})=>({occupied,header,top,bottom,start,end}))});
     let active=null;
     const flush=()=>{if(!active)return;const text=cellText(lines.flatMap(l=>l.words),column.left,column.right,active.top,active.bottom);const result=makeSession(column.day,active.start,active.end,text);if(result)results.push(result);active=null;};
     for(const slot of slots){
@@ -216,5 +215,15 @@ export function parseGridTimetable({imageData,width,height,words,anchorWords,deb
   }
   const seen=new Set();
   const output=results.filter(r=>{const key=[r.day,r.start,r.end,r.code].join('|');if(seen.has(key))return false;seen.add(key);return true;});
-  return debug?{rows:output,grid,boundaries,timeAnchors,columns:dayColumns.map(({day,left,right})=>({day,left,right})),slots:slotDiagnostics}:output;
+  const prefixCounts=new Map();
+  for(const row of output){
+    const match=row.code.match(/^([A-Z]{2,6})\\s?\\d{3,4}[A-Z]?$/i);
+    if(match){const prefix=match[1].toUpperCase();prefixCounts.set(prefix,(prefixCounts.get(prefix)||0)+1);}
+  }
+  return output.map(row=>{
+    const match=row.code.match(/^([A-Z]{2,6})\\s?\\d{3,4}[A-Z]?$/i);
+    const suffixDigit=/^[A-Z]{2,6}\\s?\\d{4}\\d\\s+(?:lec|lab|prac)/i.test(row.name);
+    const uncertain=!match||(prefixCounts.get(match[1].toUpperCase())||0)<2||suffixDigit;
+    return {...row,confidence:uncertain?'low':'review'};
+  });
 }
