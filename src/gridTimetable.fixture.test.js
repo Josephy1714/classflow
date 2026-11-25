@@ -133,7 +133,7 @@ test('UoN timetable PDF raster OCR recovers the same 11 sessions as its image',(
   const isAnchor=word=>Boolean(inferWeekday(word.text))||/\d{1,2}[:.]\\d{2}/i.test(word.text)||/^(am|pm|noon|midnight)$/i.test(word.text.trim());
   const anchors=standard.filter(isAnchor);
   const body=[...enhanced.filter(w=>!isAnchor(w)),...standard.filter(w=>!isAnchor(w))];
-  const rows=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words:body,anchorWords:anchors});
+  console.log('PDF GRID',JSON.stringify(detectGrid(decoded.data,decoded.width,decoded.height)));\n  console.log('PDF GUTTER WORDS',JSON.stringify([...standard,...enhanced].filter(w=>w.bbox?.x0<310&&w.bbox?.y0>180).map(w=>({t:w.text,x:Math.round(w.bbox.x0),y:Math.round(w.bbox.y0),c:Math.round(w.confidence)}))));\n  const rows=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words:body,anchorWords:anchors});
   assert.equal(rows.length,11,JSON.stringify({width:decoded.width,height:decoded.height,anchors,rows},null,2));
   assert.deepEqual(rows.map(r=>[r.day,r.start,r.end]).sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1])),[
     [0,'08:00','10:00'],[0,'10:00','12:00'],[0,'13:00','14:00'],
