@@ -238,7 +238,7 @@ function mergeOcrWords(standardWords,enhancedWords) {
   const enhancedBody=scaleOcrWords(enhancedWords,2).filter(word=>!isAnchorOcrWord(word.text));
   const standardBody=standardWords.filter(word=>!isAnchorOcrWord(word.text)&&word.bbox);
   const fallback=standardBody.filter(word=>!enhancedBody.some(candidate=>boxesOverlap(word.bbox,candidate.bbox)));
-  return [...anchors,...enhancedBody,...fallback];
+  return {anchorWords:anchors,words:[...enhancedBody,...fallback]};
 }
 async function recognizeTimetable(worker,source) {
   const standard=await worker.recognize(source);
@@ -250,7 +250,7 @@ async function recognizeTimetable(worker,source) {
   } finally {
     await worker.setParameters({tessedit_pageseg_mode:'3'});
   }
-  return {words:mergeOcrWords(standard.data.words,enhanced.data.words),text:standard.data.text};
+  return {...mergeOcrWords(standard.data.words,enhanced.data.words),text:standard.data.text};
 }
 async function readPdf(file,onProgress) {
   const doc=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
@@ -264,8 +264,8 @@ async function readPdf(file,onProgress) {
       canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
       await page.render({canvasContext:ctx,viewport}).promise;
       const result=await recognizeTimetable(worker,canvas);
-      const gridRows=parseGridTimetable({imageData:ctx.getImageData(0,0,canvas.width,canvas.height),width:canvas.width,height:canvas.height,words:result.words});
-      rows.push(...(gridRows.length?gridRows:parseSpatialWords(result.words)));
+      const gridRows=parseGridTimetable({imageData:ctx.getImageData(0,0,canvas.width,canvas.height),width:canvas.width,height:canvas.height,words:result.words,anchorWords:result.anchorWords});
+      rows.push(...(gridRows.length?gridRows:parseSpatialWords([...result.anchorWords,...result.words])));
       onProgress?.(`Reading timetable page ${p} of ${doc.numPages}`);
     }
   } finally { await worker.terminate(); }
@@ -306,8 +306,8 @@ export async function extractTimetable(file,onProgress) {
       canvas.width=bitmap.width;canvas.height=bitmap.height;
       ctx.drawImage(bitmap,0,0);
       const result=await recognizeTimetable(worker,canvas);
-      const gridRows=parseGridTimetable({imageData:ctx.getImageData(0,0,canvas.width,canvas.height),width:canvas.width,height:canvas.height,words:result.words});
-      rows=gridRows.length?gridRows:parseSpatialWords(result.words);
+      const gridRows=parseGridTimetable({imageData:ctx.getImageData(0,0,canvas.width,canvas.height),width:canvas.width,height:canvas.height,words:result.words,anchorWords:result.anchorWords});
+      rows=gridRows.length?gridRows:parseSpatialWords([...result.anchorWords,...result.words]);
       if(!rows.length) rows=parseText(result.text);
       bitmap.close?.();
     }finally{await worker.terminate();}
