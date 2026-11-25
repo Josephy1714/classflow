@@ -57,7 +57,7 @@ function luminance(data,width,x,y) {
   const i=(Math.max(0,Math.min(data.length/(4*width)-1,Math.round(y)))*width+Math.max(0,Math.min(width-1,Math.round(x))))*4;
   return 0.2126*data[i]+0.7152*data[i+1]+0.0722*data[i+2];
 }
-function detectGrid(data,width,height) {
+export function detectGrid(data,width,height) {
   const rowScores=[], colScores=[];
   for(let y=0;y<height;y++){
     let dark=0;
