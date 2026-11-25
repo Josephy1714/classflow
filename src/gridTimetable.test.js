@@ -28,6 +28,9 @@ test('recognizes weekday names and abbreviations',()=>{
   assert.equal(inferWeekday('MONDAY'),'Monday');
   assert.equal(inferWeekday('Tue'),'Tuesday');
   assert.equal(inferWeekday('Thursday'),'Thursday');
+  assert.equal(inferWeekday('Thurs'),'Thursday');
+  assert.equal(inferWeekday('Weds'),'Wednesday');
+  assert.equal(inferWeekday('Tues'),'Tuesday');
   assert.equal(inferWeekday('Sunday'),'Sunday');
   assert.equal(inferWeekday('Tuesday 8:00 am'), 'Tuesday');
   assert.equal(inferWeekday('Monument'), null);
