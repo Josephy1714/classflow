@@ -58,32 +58,43 @@ function luminance(data,width,x,y) {
   return 0.2126*data[i]+0.7152*data[i+1]+0.0722*data[i+2];
 }
 export function detectGrid(data,width,height) {
-  const rowScores=[], colScores=[];
-  for(let y=0;y<height;y++){
-    let dark=0;
-    for(let x=0;x<width;x++){const i=(y*width+x)*4;if((data[i]+data[i+1]+data[i+2])/3<205)dark++;}
-    rowScores.push(dark/width);
-  }
-  let horizontal=clusterPositions(rowScores.map((v,i)=>v>0.48?i:null).filter(v=>v!==null),3);
-  if(horizontal.length<3)return null;
-  const top=horizontal[0],bottom=horizontal[horizontal.length-1];
+  // Detect vertical column boundaries across the full page first. These remain
+  // continuous even when timetable cells are vertically merged.
+  const colScores=[];
   for(let x=0;x<width;x++){
     let dark=0;
-    for(let y=top;y<=bottom;y++){const i=(y*width+x)*4;if((data[i]+data[i+1]+data[i+2])/3<205)dark++;}
-    colScores.push(dark/(bottom-top+1));
+    for(let y=0;y<height;y++){const i=(y*width+x)*4;if((data[i]+data[i+1]+data[i+2])/3<205)dark++;}
+    colScores.push(dark/height);
   }
-  let vertical=clusterPositions(colScores.map((v,i)=>v>0.55?i:null).filter(v=>v!==null),3);
+  let vertical=clusterPositions(colScores.map((v,i)=>v>0.48?i:null).filter(v=>v!==null),3);
   if(vertical.length<4)return null;
-  const left=vertical[0],right=vertical[vertical.length-1];
-  horizontal=clusterPositions(rowScores.map((v,i)=>{
-    let dark=0;for(let x=left;x<=right;x++){const p=(i*width+x)*4;if((data[p]+data[p+1]+data[p+2])/3<205)dark++;}
-    return dark/(right-left+1)>0.58?i:null;
-  }).filter(v=>v!==null),3);
+
+  // The time gutter is never merged with class blocks. Detect every horizontal
+  // row boundary there instead of projecting across the entire timetable.
+  const left=vertical[0],right=vertical[1];
+  let tableTop=height,tableBottom=0;
+  for(let y=0;y<height;y++){
+    const i=(y*width+left)*4;
+    if((data[i]+data[i+1]+data[i+2])/3<205){tableTop=Math.min(tableTop,y);tableBottom=Math.max(tableBottom,y);}
+  }
+  if(tableBottom<=tableTop)return null;
+  const rowScores=[];
+  for(let y=tableTop;y<=tableBottom;y++){
+    let dark=0;
+    for(let x=left+2;x<right-2;x++){const i=(y*width+x)*4;if((data[i]+data[i+1]+data[i+2])/3<205)dark++;}
+    rowScores.push({y,score:dark/Math.max(1,right-left-4)});
+  }
+  const horizontal=clusterPositions(rowScores.filter(v=>v.score>0.42).map(v=>v.y),3);
+  if(horizontal.length<4)return null;
+
+  // Recheck verticals only over the detected table height to reject unrelated
+  // marks outside the table body.
   vertical=clusterPositions(colScores.map((v,i)=>{
-    let dark=0;for(let y=horizontal[0];y<=horizontal[horizontal.length-1];y++){const p=(y*width+i)*4;if((data[p]+data[p+1]+data[p+2])/3<205)dark++;}
+    let dark=0;
+    for(let y=horizontal[0];y<=horizontal[horizontal.length-1];y++){const p=(y*width+i)*4;if((data[p]+data[p+1]+data[p+2])/3<205)dark++;}
     return dark/(horizontal[horizontal.length-1]-horizontal[0]+1)>0.55?i:null;
   }).filter(v=>v!==null),3);
-  return horizontal.length>=3&&vertical.length>=4?{horizontal,vertical}:null;
+  return horizontal.length>=4&&vertical.length>=4?{horizontal,vertical}:null;
 }
 function interpolateAnchors(lines, anchors) {
   const map=new Map(anchors.map(a=>[a.index,a.minutes]));
