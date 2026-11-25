@@ -216,7 +216,7 @@ export function parseGridTimetable({imageData,width,height,words,anchorWords}) {
   const seen=new Set();
   const output=results.filter(r=>{const key=[r.day,r.start,r.end,r.code].join('|');if(seen.has(key))return false;seen.add(key);return true;});
   const normalized=output.map(row=>{
-    const ocrPrefix=row.code.match(/^SD8\\s?(\\d{3,4})\\b/i);
+    const ocrPrefix=row.code.match(/^SD8\s?(\d{3,4})\b/i);
     return ocrPrefix?{...row,code:`SDS ${ocrPrefix[1]}`}:row;
   });
   const prefixCounts=new Map();
