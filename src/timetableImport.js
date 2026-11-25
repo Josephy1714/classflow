@@ -157,7 +157,7 @@ function parseSpatialWords(words) {
         .sort((a,b)=>a.score-b.score)[0];
     }
     if(!mark) continue;
-    const clean=line.text.replace(timeRe,' ').replace(/[-–—|•]/g,' ').replace(new RegExp(mark.day,'i'),' ').replace(/\\s+/g,' ').trim();
+    const clean=line.text.replace(timeRe,' ').replace(/[-–—|•]/g,' ').replace(new RegExp(mark.day,'i'),' ').replace(/\s+/g,' ').trim();
     let description=clean;
     if(!description){
       const nearby=lines.filter((l,j)=>j!==i && Math.abs(l.y-line.y)<tolerance*3 && Math.abs(((l.x0+l.x1)/2)-((line.x0+line.x1)/2))<Math.max(45,(line.x1-line.x0)*0.8))
