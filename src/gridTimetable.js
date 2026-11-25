@@ -217,12 +217,12 @@ export function parseGridTimetable({imageData,width,height,words,anchorWords}) {
   const output=results.filter(r=>{const key=[r.day,r.start,r.end,r.code].join('|');if(seen.has(key))return false;seen.add(key);return true;});
   const prefixCounts=new Map();
   for(const row of output){
-    const match=row.code.match(/^([A-Z]{2,6})\\s?\\d{3,4}[A-Z]?$/i);
+    const match=row.code.match(/^([A-Z]{2,6})\s?\d{3,4}[A-Z]?$/i);
     if(match){const prefix=match[1].toUpperCase();prefixCounts.set(prefix,(prefixCounts.get(prefix)||0)+1);}
   }
   return output.map(row=>{
-    const match=row.code.match(/^([A-Z]{2,6})\\s?\\d{3,4}[A-Z]?$/i);
-    const suffixDigit=/^[A-Z]{2,6}\\s?\\d{4}\\d\\s+(?:lec|lab|prac)/i.test(row.name);
+    const match=row.code.match(/^([A-Z]{2,6})\s?\d{3,4}[A-Z]?$/i);
+    const suffixDigit=/^[A-Z]{2,6}\s?\d{4}\d\s+(?:lec|lab|prac)/i.test(row.name);
     const uncertain=!match||(prefixCounts.get(match[1].toUpperCase())||0)<2||suffixDigit;
     return {...row,confidence:uncertain?'low':'review'};
   });
