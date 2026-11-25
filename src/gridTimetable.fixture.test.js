@@ -1,8 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {execFileSync} from 'node:child_process';
 import jpeg from 'jpeg-js';
 import {parseGridTimetable,detectGrid} from './gridTimetable.js';
+
+
+test('OCR reads the uploaded timetable and recovers its 11 class blocks',()=>{
+  const file=new URL('../test-fixtures/IMG-20260906-WA0006(4).jpg',import.meta.url);
+  const decoded=jpeg.decode(fs.readFileSync(file),{useTArray:true});
+  const tsv=execFileSync('tesseract',[file.pathname,'stdout','tsv'],{encoding:'utf8',maxBuffer:8*1024*1024});
+  const words=tsv.split(/\\r?\\n/).slice(1).flatMap(line=>{
+    const c=line.split('\\t');
+    if(c.length<12||c[0]!=='5'||!c[11]?.trim()||Number(c[10])<18)return [];
+    const x=Number(c[6]),y=Number(c[7]),w=Number(c[8]),h=Number(c[9]);
+    return [{text:c[11],confidence:Number(c[10]),bbox:{x0:x,y0:y,x1:x+w,y1:y+h}}];
+  });
+  const rows=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words});
+  assert.equal(rows.length,11,JSON.stringify({words:words.length,rows},null,2));
+  assert.deepEqual(rows.map(r=>[r.day,r.start,r.end]).sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1])),[
+    [0,'08:00','10:00'],[0,'10:00','12:00'],[0,'13:00','14:00'],
+    [1,'08:00','10:00'],[1,'10:00','11:00'],[1,'13:00','14:00'],[1,'15:00','17:00'],
+    [2,'08:00','10:00'],[3,'10:00','11:00'],[3,'13:00','14:00'],[4,'09:00','12:00']
+  ]);
+});
 
 test('detects sessions in the uploaded real timetable grid geometry',()=>{
   const bytes=fs.readFileSync(new URL('../test-fixtures/IMG-20260906-WA0006(4).jpg',import.meta.url));
