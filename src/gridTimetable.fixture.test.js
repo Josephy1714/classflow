@@ -121,8 +121,8 @@ test('UoN timetable PDF raster OCR recovers the same 11 sessions as its image',(
   const decoded=jpeg.decode(fs.readFileSync(raster),{useTArray:true});
   const readWords=(base,args=[])=>{
     execFileSync('tesseract',[raster,...args,base,'tsv'],{maxBuffer:16*1024*1024});
-    return fs.readFileSync(base+'.tsv','utf8').split(/\\r?\\n/).slice(1).flatMap(line=>{
-      const c=line.split('\\t');
+    return fs.readFileSync(base+'.tsv','utf8').split(/\r?\n/).slice(1).flatMap(line=>{
+      const c=line.split('\t');
       if(c.length<12||c[0]!=='5'||!c[11]?.trim())return [];
       const x=Number(c[6]),y=Number(c[7]),w=Number(c[8]),h=Number(c[9]);
       return [{text:c[11],confidence:Number(c[10]),bbox:{x0:x,y0:y,x1:x+w,y1:y+h}}];
@@ -130,7 +130,7 @@ test('UoN timetable PDF raster OCR recovers the same 11 sessions as its image',(
   };
   const standard=readWords('/tmp/classflow-uon-pdf-standard');
   const enhanced=readWords('/tmp/classflow-uon-pdf-enhanced',['--psm','11']);
-  const isAnchor=word=>Boolean(inferWeekday(word.text))||/\\d{1,2}[:.]\\d{2}/i.test(word.text)||/^(am|pm|noon|midnight)$/i.test(word.text.trim());
+  const isAnchor=word=>Boolean(inferWeekday(word.text))||/\d{1,2}[:.]\\d{2}/i.test(word.text)||/^(am|pm|noon|midnight)$/i.test(word.text.trim());
   const anchors=standard.filter(isAnchor);
   const body=[...enhanced.filter(w=>!isAnchor(w)),...standard.filter(w=>!isAnchor(w))];
   const rows=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words:body,anchorWords:anchors});
