@@ -229,7 +229,7 @@ async function readPdf(file,onProgress) {
   // Preserve extracted PDF line structure as a secondary fallback before OCR.
   const pdfLines=[];
   for(let p=1;p<=doc.numPages;p++){const page=await doc.getPage(p),content=await page.getTextContent();pdfLines.push(...groupPdfItems(content.items));}
-  const textFallback=parseText(pdfLines.join('\\n'));
+  const textFallback=parseText(pdfLines.join('\n'));
   if(textFallback.length) return textFallback;
   // OCR even when a PDF contains selectable text: some PDFs have headers/text but the timetable itself is an image.
   const {createWorker}=await import('tesseract.js');
