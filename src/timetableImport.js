@@ -126,9 +126,11 @@ function parseText(text) {
 
 function parseSpatialWords(words) {
   const items=(words||[]).filter(w=>w.text?.trim() && (w.confidence==null || w.confidence>18)).map(w=>({
-    text:w.text.trim(), x:(w.bbox?.x0+w.bbox?.x1)/2 || 0,
-    y:(w.bbox?.y0+w.bbox?.y1)/2 || 0,
-    x0:w.bbox?.x0||0, x1:w.bbox?.x1||0, y0:w.bbox?.y0||0, y1:w.bbox?.y1||0
+    text:w.text.trim(),
+    x:(((w.bbox?.x0 ?? w.x0 ?? 0)+(w.bbox?.x1 ?? w.x1 ?? 0))/2),
+    y:(((w.bbox?.y0 ?? w.y0 ?? 0)+(w.bbox?.y1 ?? w.y1 ?? 0))/2),
+    x0:w.bbox?.x0 ?? w.x0 ?? 0, x1:w.bbox?.x1 ?? w.x1 ?? 0,
+    y0:w.bbox?.y0 ?? w.y0 ?? 0, y1:w.bbox?.y1 ?? w.y1 ?? 0
   }));
   if(!items.length) return [];
   const heights=items.map(w=>Math.max(1,w.y1-w.y0)).sort((a,b)=>a-b);
@@ -194,6 +196,11 @@ async function readPdf(file,onProgress) {
   // Use actual PDF text coordinates first; unlike flattened text, this preserves table columns.
   let rows=parseSpatialWords(positioned);
   if(rows.length) return rows;
+  // Preserve extracted PDF line structure as a secondary fallback before OCR.
+  const pdfLines=[];
+  for(let p=1;p<=doc.numPages;p++){const page=await doc.getPage(p),content=await page.getTextContent();pdfLines.push(...groupPdfItems(content.items));}
+  const textFallback=parseText(pdfLines.join('\\n'));
+  if(textFallback.length) return textFallback;
   // OCR even when a PDF contains selectable text: some PDFs have headers/text but the timetable itself is an image.
   const {createWorker}=await import('tesseract.js');
   const worker=await createWorker('eng',1,{logger:m=>onProgress?.(`OCR ${Math.round((m.progress||0)*100)}%`)});
