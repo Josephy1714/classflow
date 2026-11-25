@@ -215,7 +215,7 @@ function preprocessForOcr(source,scale=2) {
 }
 function isAnchorOcrWord(value='') {
   const text=String(value).trim();
-  return Boolean(inferWeekday(text))||/\\d{1,2}[:.]\\d{2}/i.test(text)||/^(am|pm|noon|midnight)$/i.test(text);
+  return Boolean(inferWeekday(text))||/\d{1,2}[:.]\d{2}/i.test(text)||/^(am|pm|noon|midnight)$/i.test(text);
 }
 function scaleOcrWords(words,scale=1) {
   return (words||[]).flatMap(word=>{
