@@ -22,8 +22,9 @@ function parseTimePair(text) {
   return values.length>=2 ? [values[0],values[1]] : null;
 }
 function inferDay(text) {
-  const t=normalize(text);
-  return DAYS.find(d => new RegExp('\\b'+d.toLowerCase()+'\\b').test(t)) || null;
+  const t=normalize(text).replace(/[^a-z]/g,'');
+  const aliases={mon:'Monday',monday:'Monday',tue:'Tuesday',tues:'Tuesday',tuesday:'Tuesday',wed:'Wednesday',weds:'Wednesday',wednesday:'Wednesday',thu:'Thursday',thur:'Thursday',thurs:'Thursday',thursday:'Thursday',fri:'Friday',friday:'Friday',sat:'Saturday',saturday:'Saturday',sun:'Sunday',sunday:'Sunday'};
+  return aliases[t]||null;
 }
 function cleanCell(value) {
   return String(value??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim();
@@ -125,47 +126,68 @@ function parseText(text) {
 }
 
 function parseSpatialWords(words) {
-  const items=(words||[]).filter(w=>w.text?.trim() && (w.confidence==null || w.confidence>18)).map(w=>({
-    text:w.text.trim(),
-    x:(((w.bbox?.x0 ?? w.x0 ?? 0)+(w.bbox?.x1 ?? w.x1 ?? 0))/2),
-    y:(((w.bbox?.y0 ?? w.y0 ?? 0)+(w.bbox?.y1 ?? w.y1 ?? 0))/2),
-    x0:w.bbox?.x0 ?? w.x0 ?? 0, x1:w.bbox?.x1 ?? w.x1 ?? 0,
-    y0:w.bbox?.y0 ?? w.y0 ?? 0, y1:w.bbox?.y1 ?? w.y1 ?? 0
-  }));
+  const items=(words||[]).filter(w=>w.text?.trim() && (w.confidence==null || w.confidence>18)).map(w=>{
+    const x0=w.bbox?.x0 ?? w.x0 ?? 0, x1=w.bbox?.x1 ?? w.x1 ?? 0;
+    const y0=w.bbox?.y0 ?? w.y0 ?? 0, y1=w.bbox?.y1 ?? w.y1 ?? 0;
+    return {text:w.text.trim(),x:(x0+x1)/2,y:(y0+y1)/2,x0,x1,y0,y1};
+  });
   if(!items.length) return [];
-  const heights=items.map(w=>Math.max(1,w.y1-w.y0)).sort((a,b)=>a-b);
-  const tolerance=Math.max(8,(heights[Math.floor(heights.length/2)]||12)*0.75);
+  const heights=items.map(w=>Math.max(1,Math.abs(w.y1-w.y0))).sort((a,b)=>a-b);
+  const h=heights[Math.floor(heights.length/2)]||12, tolerance=Math.max(5,h*0.8);
   const lines=[];
-  for(const w of items.sort((a,b)=>a.y-b.y||a.x-b.x)){
+  for(const w of items.slice().sort((a,b)=>a.y-b.y||a.x-b.x)){
     let line=lines.find(l=>Math.abs(l.y-w.y)<=tolerance);
     if(!line){line={y:w.y,words:[]};lines.push(line);}
     line.words.push(w);line.y=line.words.reduce((n,x)=>n+x.y,0)/line.words.length;
   }
-  lines.forEach(l=>{l.words.sort((a,b)=>a.x-b.x);l.text=l.words.map(w=>w.text).join(' ');l.x0=Math.min(...l.words.map(w=>w.x0));l.x1=Math.max(...l.words.map(w=>w.x1));});
+  for(const l of lines){l.words.sort((a,b)=>a.x-b.x);l.text=l.words.map(w=>w.text).join(' ');}
   const dayMarks=[];
-  for(const line of lines) for(const w of line.words){const d=inferDay(w.text);if(d)dayMarks.push({day:d,x:w.x,y:w.y});}
+  for(const w of items){const day=inferDay(w.text);if(day)dayMarks.push({day,x:w.x,y:w.y});}
   const found=[];
-  for(let i=0;i<lines.length;i++){
-    const line=lines[i], pair=parseTimePair(line.text);
-    if(!pair || pair[0]>=pair[1]) continue;
-    const ownDay=inferDay(line.text);
-    let mark=ownDay?{day:ownDay,x:(line.x0+line.x1)/2,y:line.y}:null;
-    if(!mark && dayMarks.length){
-      const cx=(line.x0+line.x1)/2;
-      // Prefer a day heading in the same column; break ties by distance.
-      mark=dayMarks.map(d=>({...d,score:Math.abs(d.x-cx)+Math.abs(d.y-line.y)*0.18}))
-        .sort((a,b)=>a.score-b.score)[0];
+  // Case 1: each class cell contains its own day and time range.
+  for(const line of lines){
+    const pair=parseTimePair(line.text);
+    if(!pair||pair[0]>=pair[1])continue;
+    const day=inferDay(line.text);
+    if(day){
+      const desc=line.words.filter(w=>!parseTimes(w.text).length&&!inferDay(w.text)).map(w=>w.text).join(' ')||'Imported class — please review';
+      const result=session(day,pair.join(' - '),desc);
+      if(result)found.push(result);
     }
-    if(!mark) continue;
-    const clean=line.text.replace(timeRe,' ').replace(/[-–—|•]/g,' ').replace(new RegExp(mark.day,'i'),' ').replace(/\s+/g,' ').trim();
-    let description=clean;
-    if(!description){
-      const nearby=lines.filter((l,j)=>j!==i && Math.abs(l.y-line.y)<tolerance*3 && Math.abs(((l.x0+l.x1)/2)-((line.x0+line.x1)/2))<Math.max(45,(line.x1-line.x0)*0.8))
-        .sort((a,b)=>Math.abs(a.y-line.y)-Math.abs(b.y-line.y));
-      description=nearby.map(l=>l.text).find(t=>!inferDay(t)&&!parseTimePair(t))||'Imported class — please review';
+  }
+  // Case 2: conventional timetable grid: weekday headings define columns,
+  // time ranges define rows, and course names occupy the matching cells.
+  if(dayMarks.length>=2){
+    const columns=[...new Map(dayMarks.sort((a,b)=>a.x-b.x).map(d=>[d.day,d])).values()].sort((a,b)=>a.x-b.x);
+    const boundaries=columns.map((d,i)=>({
+      ...d,left:i===0?-Infinity:(columns[i-1].x+d.x)/2,
+      right:i===columns.length-1?Infinity:(d.x+columns[i+1].x)/2
+    }));
+    for(const line of lines){
+      const pair=parseTimePair(line.text);
+      if(!pair||pair[0]>=pair[1])continue;
+      const rowY=line.y;
+      for(const col of boundaries){
+        if(found.some(r=>r.day===DAYS.indexOf(col.day)&&r.start===pair[0]&&r.end===pair[1]))continue;
+        const cellWords=items.filter(w=>w.x>col.left&&w.x<=col.right&&Math.abs(w.y-rowY)<=Math.max(h*3.2,18)
+          &&!parseTimes(w.text).length&&!inferDay(w.text));
+        const description=cellWords.sort((a,b)=>a.x-b.x).map(w=>w.text).join(' ').replace(/\s+/g,' ').trim();
+        if(!description)continue;
+        const result=session(col.day,pair.join(' - '),description);
+        if(result)found.push(result);
+      }
     }
-    const result=session(mark.day,pair.join(' - '),description);
-    if(result) found.push({...result,confidence:'review'});
+  }
+  // Case 3: a time and its course name share a row under a weekday heading.
+  if(!found.length&&dayMarks.length){
+    for(const line of lines){
+      const pair=parseTimePair(line.text);if(!pair||pair[0]>=pair[1])continue;
+      const x=line.words.reduce((n,w)=>n+w.x,0)/line.words.length;
+      const mark=dayMarks.slice().sort((a,b)=>Math.abs(a.x-x)-Math.abs(b.x-x))[0];
+      const desc=line.words.filter(w=>!parseTimes(w.text).length&&!inferDay(w.text)).map(w=>w.text).join(' ');
+      const result=session(mark.day,pair.join(' - '),desc||'Imported class — please review');
+      if(result)found.push(result);
+    }
   }
   return dedupe(found);
 }
