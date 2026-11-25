@@ -215,12 +215,16 @@ export function parseGridTimetable({imageData,width,height,words,anchorWords}) {
   }
   const seen=new Set();
   const output=results.filter(r=>{const key=[r.day,r.start,r.end,r.code].join('|');if(seen.has(key))return false;seen.add(key);return true;});
+  const normalized=output.map(row=>{
+    const ocrPrefix=row.code.match(/^SD8\\s?(\\d{3,4})\\b/i);
+    return ocrPrefix?{...row,code:`SDS ${ocrPrefix[1]}`}:row;
+  });
   const prefixCounts=new Map();
-  for(const row of output){
+  for(const row of normalized){
     const match=row.code.match(/^([A-Z]{2,6})\s?\d{3,4}[A-Z]?$/i);
     if(match){const prefix=match[1].toUpperCase();prefixCounts.set(prefix,(prefixCounts.get(prefix)||0)+1);}
   }
-  return output.map(row=>{
+  return normalized.map(row=>{
     const match=row.code.match(/^([A-Z]{2,6})\s?\d{3,4}[A-Z]?$/i);
     const suffixDigit=/^[A-Z]{2,6}\s?\d{4}\d\s+(?:lec|lab|prac)/i.test(row.name);
     const uncertain=!match||(prefixCounts.get(match[1].toUpperCase())||0)<2||suffixDigit;
