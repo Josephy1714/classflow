@@ -224,6 +224,22 @@ function scaleOcrWords(words,scale=1) {
     return [{...word,bbox:{x0:b.x0/scale,y0:b.y0/scale,x1:b.x1/scale,y1:b.y1/scale}}];
   });
 }
+function boxesOverlap(a,b) {
+  if(!a||!b)return false;
+  const width=Math.max(0,Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0));
+  const height=Math.max(0,Math.min(a.y1,b.y1)-Math.max(a.y0,b.y0));
+  const overlap=width*height;
+  const areaA=Math.max(1,(a.x1-a.x0)*(a.y1-a.y0));
+  const areaB=Math.max(1,(b.x1-b.x0)*(b.y1-b.y0));
+  return overlap/Math.min(areaA,areaB)>0.3;
+}
+function mergeOcrWords(standardWords,enhancedWords) {
+  const anchors=standardWords.filter(word=>isAnchorOcrWord(word.text));
+  const enhancedBody=scaleOcrWords(enhancedWords,2).filter(word=>!isAnchorOcrWord(word.text));
+  const standardBody=standardWords.filter(word=>!isAnchorOcrWord(word.text)&&word.bbox);
+  const fallback=standardBody.filter(word=>!enhancedBody.some(candidate=>boxesOverlap(word.bbox,candidate.bbox)));
+  return [...anchors,...enhancedBody,...fallback];
+}
 async function recognizeTimetable(worker,source) {
   const standard=await worker.recognize(source);
   const enhancedCanvas=preprocessForOcr(source,2);
@@ -234,9 +250,7 @@ async function recognizeTimetable(worker,source) {
   } finally {
     await worker.setParameters({tessedit_pageseg_mode:'3'});
   }
-  const anchors=standard.data.words.filter(word=>isAnchorOcrWord(word.text));
-  const body=scaleOcrWords(enhanced.data.words,2).filter(word=>!isAnchorOcrWord(word.text));
-  return {words:[...anchors,...body],text:standard.data.text};
+  return {words:mergeOcrWords(standard.data.words,enhanced.data.words),text:standard.data.text};
 }
 async function readPdf(file,onProgress) {
   const doc=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
