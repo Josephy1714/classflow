@@ -8,11 +8,12 @@ test('detects sessions in the uploaded real timetable grid geometry',()=>{
   const bytes=fs.readFileSync(new URL('../test-fixtures/IMG-20260906-WA0006(4).jpg',import.meta.url));
   const decoded=jpeg.decode(bytes,{useTArray:true});
   const words=[];
+  const sx=decoded.width/1219,sy=decoded.height/1600;
   const addLine=(text,x,y)=>{
     let cursor=x;
     for(const token of text.split(/\s+/)){
       const width=Math.max(7,token.length*7);
-      words.push({text:token,confidence:98,bbox:{x0:cursor,y0:y-6,x1:cursor+width,y1:y+6}});
+      words.push({text:token,confidence:98,bbox:{x0:cursor*sx,y0:(y-6)*sy,x1:(cursor+width)*sx,y1:(y+6)*sy}});
       cursor+=width+4;
     }
   };
