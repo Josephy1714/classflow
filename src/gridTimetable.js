@@ -135,11 +135,12 @@ function cellText(words,x0,x1,y0,y1) {
 function makeSession(day,start,end,lines) {
   const clean=lines.map(s=>s.replace(/\s+/g,' ').trim()).filter(Boolean);
   if(!clean.length||start>=end)return null;
-  const title=clean[0];
-  const codeMatch=title.match(/^([A-Z]{2,6}\s?\d{3,4}[A-Z]?)/i);
+  const courseIndex=clean.findIndex(line=>/[A-Z]{2,6}\s?\d{3,4}[A-Z]?/i.test(line));
+  const title=courseIndex>=0?clean[courseIndex]:clean[0];
+  const codeMatch=title.match(/([A-Z]{2,6}\s?\d{3,4}[A-Z]?)/i);
   const code=codeMatch?codeMatch[1].replace(/\s+/g,' ').toUpperCase():title;
-  const venue=clean.slice(1).join(' · ')||'TBC';
-  return {day:DAYS.indexOf(day),code,name:title,start:asTime(start),end:asTime(end),venue,type:/tutorial/i.test(title)?'Tutorial':/prac/i.test(title)?'Practical':'Lecture',confidence:'review'};
+  const venue=clean.filter((_,i)=>i!==courseIndex).join(' · ')||'TBC';
+  return {day:DAYS.indexOf(day),code,name:title,start:asTime(start),end:asTime(end),venue,type:/tutorial/i.test(title)?'Tutorial':/prac/i.test(title)?'Practical':'Lecture',confidence:courseIndex>=0?'review':'low'};
 }
 
 export function parseGridTimetable({imageData,width,height,words,debug=false}) {
@@ -195,8 +196,9 @@ export function parseGridTimetable({imageData,width,height,words,debug=false}) {
       const top=boundaries[r],bottom=boundaries[r+1];
       const samples=cellSamples(data,width,column.left,column.right,top,bottom);
       const occupied=median(samples)<249;
-      const headerY=Math.min(bottom-2,top+Math.max(4,(bottom-top)*0.12));
-      const header=median(Array.from({length:9},(_,i)=>luminance(data,width,column.left+(column.right-column.left)*(0.18+i*0.08),headerY)))<218;
+      const headerYs=[0.08,0.16,0.24].map(f=>Math.min(bottom-2,top+(bottom-top)*f));
+      const headerSamples=headerYs.flatMap(y=>Array.from({length:9},(_,i)=>luminance(data,width,column.left+(column.right-column.left)*(0.18+i*0.08),y)));
+      const header=median(headerSamples)<218;
       slots.push({occupied,header,top,bottom,start:boundaryTimes[r],end:boundaryTimes[r+1]});
     }
     slotDiagnostics.push({day:column.day,left:column.left,right:column.right,slots:slots.map(({occupied,header,top,bottom,start,end})=>({occupied,header,top,bottom,start,end}))});
