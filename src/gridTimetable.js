@@ -72,12 +72,18 @@ export function detectGrid(data,width,height) {
   // The time gutter is never merged with class blocks. Detect every horizontal
   // row boundary there instead of projecting across the entire timetable.
   const left=vertical[0],right=vertical[1];
-  let tableTop=height,tableBottom=0;
+  const verticalRuns=[];
+  let runStart=null,lastDark=null;
   for(let y=0;y<height;y++){
-    const i=(y*width+left)*4;
-    if((data[i]+data[i+1]+data[i+2])/3<205){tableTop=Math.min(tableTop,y);tableBottom=Math.max(tableBottom,y);}
+    let darkest=255;
+    for(let dx=-1;dx<=1;dx++){const x=Math.max(0,Math.min(width-1,left+dx)),i=(y*width+x)*4;darkest=Math.min(darkest,(data[i]+data[i+1]+data[i+2])/3);}
+    if(darkest<205){if(runStart===null)runStart=y;lastDark=y;}
+    else if(runStart!==null){verticalRuns.push({start:runStart,end:lastDark,length:lastDark-runStart+1});runStart=null;lastDark=null;}
   }
-  if(tableBottom<=tableTop)return null;
+  if(runStart!==null)verticalRuns.push({start:runStart,end:lastDark,length:lastDark-runStart+1});
+  const longest=verticalRuns.sort((a,b)=>b.length-a.length)[0];
+  if(!longest||longest.length<height*0.25)return null;
+  const tableTop=longest.start,tableBottom=longest.end;
   const rowScores=[];
   for(let y=tableTop;y<=tableBottom;y++){
     let dark=0;
