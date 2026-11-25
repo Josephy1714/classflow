@@ -120,7 +120,7 @@ test('UoN timetable PDF raster OCR recovers the same 11 sessions as its image',(
   const raster=prefix+'-1.jpg';
   const decoded=jpeg.decode(fs.readFileSync(raster),{useTArray:true});
   const readWords=(base,args=[])=>{
-    execFileSync('tesseract',[raster,base,'tsv',...args],{maxBuffer:16*1024*1024});
+    execFileSync('tesseract',[raster,base,...args,'tsv'],{maxBuffer:16*1024*1024});
     return fs.readFileSync(base+'.tsv','utf8').split(/\\r?\\n/).slice(1).flatMap(line=>{
       const c=line.split('\\t');
       if(c.length<12||c[0]!=='5'||!c[11]?.trim())return [];
