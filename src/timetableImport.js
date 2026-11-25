@@ -123,6 +123,51 @@ function parseText(text) {
   }
   return dedupe(rows);
 }
+
+function parseSpatialWords(words) {
+  const items=(words||[]).filter(w=>w.text?.trim() && (w.confidence==null || w.confidence>18)).map(w=>({
+    text:w.text.trim(), x:(w.bbox?.x0+w.bbox?.x1)/2 || 0,
+    y:(w.bbox?.y0+w.bbox?.y1)/2 || 0,
+    x0:w.bbox?.x0||0, x1:w.bbox?.x1||0, y0:w.bbox?.y0||0, y1:w.bbox?.y1||0
+  }));
+  if(!items.length) return [];
+  const heights=items.map(w=>Math.max(1,w.y1-w.y0)).sort((a,b)=>a-b);
+  const tolerance=Math.max(8,(heights[Math.floor(heights.length/2)]||12)*0.75);
+  const lines=[];
+  for(const w of items.sort((a,b)=>a.y-b.y||a.x-b.x)){
+    let line=lines.find(l=>Math.abs(l.y-w.y)<=tolerance);
+    if(!line){line={y:w.y,words:[]};lines.push(line);}
+    line.words.push(w);line.y=line.words.reduce((n,x)=>n+x.y,0)/line.words.length;
+  }
+  lines.forEach(l=>{l.words.sort((a,b)=>a.x-b.x);l.text=l.words.map(w=>w.text).join(' ');l.x0=Math.min(...l.words.map(w=>w.x0));l.x1=Math.max(...l.words.map(w=>w.x1));});
+  const dayMarks=[];
+  for(const line of lines) for(const w of line.words){const d=inferDay(w.text);if(d)dayMarks.push({day:d,x:w.x,y:w.y});}
+  const found=[];
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i], pair=parseTimePair(line.text);
+    if(!pair || pair[0]>=pair[1]) continue;
+    const ownDay=inferDay(line.text);
+    let mark=ownDay?{day:ownDay,x:(line.x0+line.x1)/2,y:line.y}:null;
+    if(!mark && dayMarks.length){
+      const cx=(line.x0+line.x1)/2;
+      // Prefer a day heading in the same column; break ties by distance.
+      mark=dayMarks.map(d=>({...d,score:Math.abs(d.x-cx)+Math.abs(d.y-line.y)*0.18}))
+        .sort((a,b)=>a.score-b.score)[0];
+    }
+    if(!mark) continue;
+    const clean=line.text.replace(timeRe,' ').replace(/[-–—|•]/g,' ').replace(new RegExp(mark.day,'i'),' ').replace(/\\s+/g,' ').trim();
+    let description=clean;
+    if(!description){
+      const nearby=lines.filter((l,j)=>j!==i && Math.abs(l.y-line.y)<tolerance*3 && Math.abs(((l.x0+l.x1)/2)-((line.x0+line.x1)/2))<Math.max(45,(line.x1-line.x0)*0.8))
+        .sort((a,b)=>Math.abs(a.y-line.y)-Math.abs(b.y-line.y));
+      description=nearby.map(l=>l.text).find(t=>!inferDay(t)&&!parseTimePair(t))||'Imported class — please review';
+    }
+    const result=session(mark.day,pair.join(' - '),description);
+    if(result) found.push({...result,confidence:'review'});
+  }
+  return dedupe(found);
+}
+
 function groupPdfItems(items) {
   const positioned=items.filter(x=>x.str?.trim()).map(x=>({text:x.str.trim(),x:x.transform?.[4]||0,y:x.transform?.[5]||0}));
   const lines=[];
@@ -177,7 +222,7 @@ export async function extractTimetable(file,onProgress) {
     }
     if(!rows.length)rows=parseText(doc.documentElement.textContent||'');
   }else if(name.endsWith('.pdf')){
-    rows=parseText(await readPdf(file,onProgress));
+    rows=await readPdf(file,onProgress);
   }else if(/\.(png|jpe?g|webp|bmp)$/i.test(name)){
     const {createWorker}=await import('tesseract.js');
     const worker=await createWorker('eng',1,{logger:m=>onProgress?.(`OCR ${Math.round((m.progress||0)*100)}%`)});
