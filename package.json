@@ -20,5 +20,7 @@
     "vite": "^6.0.5",
     "xlsx": "^0.18.5"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "jpeg-js": "^0.4.4"
+  }
 }
