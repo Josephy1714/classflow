@@ -3,8 +3,22 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import jpeg from 'jpeg-js';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import {parseGridTimetable,detectGrid} from './gridTimetable.js';
 
+
+test('inspect selectable text in the uploaded PDF fixture',async()=>{
+  const bytes=fs.readFileSync(new URL('../test-fixtures/timetable.pdf',import.meta.url));
+  const doc=await pdfjsLib.getDocument({data:new Uint8Array(bytes)}).promise;
+  const items=[];
+  for(let pageNo=1;pageNo<=doc.numPages;pageNo++){
+    const page=await doc.getPage(pageNo);
+    const content=await page.getTextContent();
+    items.push(...content.items.map(item=>item.str).filter(Boolean));
+  }
+  console.log('PDF selectable text:',items.join(' | '));
+  assert.ok(doc.numPages>=1);
+});
 
 test('OCR reads the uploaded timetable and recovers its 11 class blocks',()=>{
   const file=new URL('../test-fixtures/IMG-20260906-WA0006(4).jpg',import.meta.url);
