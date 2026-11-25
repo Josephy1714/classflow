@@ -236,7 +236,8 @@ export async function extractTimetable(file,onProgress) {
     try{
       const result=await worker.recognize(file);
       // Preserve OCR line boundaries; do not collapse the table into a paragraph.
-      rows=parseSpatialWords(result.data.words);\n      if(!rows.length) rows=parseText(result.data.text);
+      rows=parseSpatialWords(result.data.words);
+      if(!rows.length) rows=parseText(result.data.text);
     }finally{await worker.terminate();}
   }else throw new Error('Supported formats: PDF, PNG, JPG, WEBP, CSV, XLSX, XLS, ODS and ODT.');
   rows=dedupe(rows);
