@@ -23,14 +23,16 @@ test('inspect selectable text in the uploaded PDF fixture',async()=>{
 test('OCR reads the uploaded timetable and recovers its 11 class blocks',()=>{
   const file=new URL('../test-fixtures/IMG-20260906-WA0006(4).jpg',import.meta.url);
   const decoded=jpeg.decode(fs.readFileSync(file),{useTArray:true});
+  const preprocessed='/tmp/classflow-timetable-preprocessed.png';
+  execFileSync('convert',[file.pathname,'-colorspace','Gray','-resize','200%','-threshold','55%',preprocessed],{maxBuffer:8*1024*1024});
   const outputBase='/tmp/classflow-timetable-ocr';
-  execFileSync('tesseract',[file.pathname,outputBase,'--psm','11','tsv'],{maxBuffer:8*1024*1024});
+  execFileSync('tesseract',[preprocessed,outputBase,'--psm','11','tsv'],{maxBuffer:8*1024*1024});
   const tsv=fs.readFileSync(outputBase+'.tsv','utf8');
   const words=tsv.split(/\r?\n/).slice(1).flatMap(line=>{
     const c=line.split('\t');
     if(c.length<12||c[0]!=='5'||!c[11]?.trim())return [];
     const x=Number(c[6]),y=Number(c[7]),w=Number(c[8]),h=Number(c[9]);
-    return [{text:c[11],confidence:Number(c[10]),bbox:{x0:x,y0:y,x1:x+w,y1:y+h}}];
+    return [{text:c[11],confidence:Number(c[10]),bbox:{x0:x/2,y0:y/2,x1:(x+w)/2,y1:(y+h)/2}}];
   });
   const rows=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words});
   console.log('OCR timetable rows:',JSON.stringify(rows));
