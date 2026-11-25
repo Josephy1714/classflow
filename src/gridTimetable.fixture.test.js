@@ -19,6 +19,7 @@ test('OCR reads the uploaded timetable and recovers its 11 class blocks',()=>{
     return [{text:c[11],confidence:Number(c[10]),bbox:{x0:x,y0:y,x1:x+w,y1:y+h}}];
   });
   const rows=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words});
+  console.log('OCR timetable rows:',JSON.stringify(rows));
   assert.equal(rows.length,11,JSON.stringify({tsv:tsv.slice(0,1200),words:words.length,rows},null,2));
   assert.deepEqual(rows.map(r=>[r.day,r.start,r.end]).sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1])),[
     [0,'08:00','10:00'],[0,'10:00','12:00'],[0,'13:00','14:00'],
