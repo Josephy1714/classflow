@@ -38,10 +38,18 @@ test('OCR reads the uploaded timetable and recovers its 11 class blocks',()=>{
   execFileSync('tesseract',[preprocessed,enhancedBase,'--psm','11','tsv'],{maxBuffer:8*1024*1024});
   const enhancedWords=parseTsv(fs.readFileSync(enhancedBase+'.tsv','utf8'),2);
   const isAnchor=word=>Boolean(inferWeekday(word.text))||/\d{1,2}[:.]\d{2}/i.test(word.text)||/^(am|pm|noon|midnight)$/i.test(word.text.trim());
-  const words=[...standardWords.filter(isAnchor),...enhancedWords.filter(word=>!isAnchor(word))];
+  const boxesOverlap=(a,b)=>{
+    const w=Math.max(0,Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0));
+    const h=Math.max(0,Math.min(a.y1,b.y1)-Math.max(a.y0,b.y0));
+    const overlap=w*h,areaA=Math.max(1,(a.x1-a.x0)*(a.y1-a.y0)),areaB=Math.max(1,(b.x1-b.x0)*(b.y1-b.y0));
+    return overlap/Math.min(areaA,areaB)>0.3;
+  };
+  const enhancedBody=enhancedWords.filter(word=>!isAnchor(word));
+  const fallback=standardWords.filter(word=>!isAnchor(word)&&word.bbox&&!enhancedBody.some(candidate=>boxesOverlap(word.bbox,candidate.bbox)));
+  const words=[...standardWords.filter(isAnchor),...enhancedBody,...fallback];
   const rows=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words});
   console.log('OCR timetable rows:',JSON.stringify(rows));
-  assert.equal(rows.length,11,JSON.stringify({tsv:tsv.slice(0,1200),words:words.length,rows},null,2));
+  assert.equal(rows.length,11,JSON.stringify({words:words.length,rows},null,2));
   assert.deepEqual(rows.map(r=>[r.day,r.start,r.end]).sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1])),[
     [0,'08:00','10:00'],[0,'10:00','12:00'],[0,'13:00','14:00'],
     [1,'08:00','10:00'],[1,'10:00','11:00'],[1,'13:00','14:00'],[1,'15:00','17:00'],
