@@ -3,13 +3,13 @@ import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-const normalize = (s='') => String(s).toLowerCase().replace(/\\s+/g,' ').trim();
-const timeRe = /\\b(\\d{1,2})[:.](\\d{2})\\s*(a\\.?m\\.?|p\\.?m\\.?)?\\b/gi;
+const normalize = (s='') => String(s).toLowerCase().replace(/\s+/g,' ').trim();
+const timeRe = /\b(\d{1,2})[:.](\d{2})\s*(a\.?m\.?|p\.?m\.?)?\b/gi;
 
 function parseTimes(text) {
   const matches = [...String(text).matchAll(timeRe)];
   const values = matches.map(m => {
-    let h=Number(m[1]), min=Number(m[2]), ap=(m[3]||'').toLowerCase().replace(/\\./g,'');
+    let h=Number(m[1]), min=Number(m[2]), ap=(m[3]||'').toLowerCase().replace(/\./g,'');
     if (h>23 || min>59) return null;
     if(ap==='pm'&&h<12)h+=12;
     if(ap==='am'&&h===12)h=0;
@@ -23,16 +23,16 @@ function parseTimePair(text) {
 }
 function inferDay(text) {
   const t=normalize(text);
-  return DAYS.find(d => new RegExp('\\\\b'+d.toLowerCase()+'\\\\b').test(t)) || null;
+  return DAYS.find(d => new RegExp('\\b'+d.toLowerCase()+'\\b').test(t)) || null;
 }
 function cleanCell(value) {
-  return String(value??'').replace(/[\\r\\n]+/g,' ').replace(/\\s+/g,' ').trim();
+  return String(value??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim();
 }
 function session(day, timeText, description, extra='') {
   const pair=parseTimePair(timeText);
   if(!day || !pair || pair[0]>=pair[1]) return null;
   const detail=cleanCell(description)||'Imported class';
-  const bits=detail.split(/\\s+[|•–—]\\s+/).filter(Boolean);
+  const bits=detail.split(/\s+[|•–—]\s+/).filter(Boolean);
   const code=bits[0]||detail;
   return {day:DAYS.indexOf(day),code,name:bits[1]||code,start:pair[0],end:pair[1],venue:cleanCell(extra)||bits.slice(2).join(' ')||'TBC',type:'Lecture',confidence:'review'};
 }
@@ -94,12 +94,12 @@ function dedupe(rows) {
   return rows.filter(r=>{const k=[r.day,r.start,r.end,r.code,r.venue].join('|');if(seen.has(k))return false;seen.add(k);return true;});
 }
 function parseText(text) {
-  const lines=String(text).split(/\\n|\\r/).map(x=>x.trim()).filter(Boolean);
+  const lines=String(text).split(/\n|\r/).map(x=>x.trim()).filter(Boolean);
   const rows=[];
   for(let i=0;i<lines.length;i++){
     const line=lines[i], day=inferDay(line), pair=parseTimePair(line);
     if(day&&pair){
-      const rest=line.replace(timeRe,' ').replace(new RegExp(day,'i'),' ').replace(/[|,;\\t]+/g,' ').trim();
+      const rest=line.replace(timeRe,' ').replace(new RegExp(day,'i'),' ').replace(/[|,;\t]+/g,' ').trim();
       const next=lines[i+1]||'';
       const detail=rest||(!inferDay(next)&&!parseTimePair(next)?next:'');
       const result=session(day,pair.join(' - '),detail);
@@ -138,11 +138,11 @@ async function readPdf(file,onProgress) {
   let pages=[];
   for(let p=1;p<=doc.numPages;p++){
     const page=await doc.getPage(p), content=await page.getTextContent();
-    pages.push(groupPdfItems(content.items).join('\\n'));
+    pages.push(groupPdfItems(content.items).join('\n'));
     onProgress?.(`Reading PDF page ${p} of ${doc.numPages}`);
   }
-  let text=pages.join('\\n');
-  if(text.replace(/\\s/g,'').length>40) return text;
+  let text=pages.join('\n');
+  if(text.replace(/\s/g,'').length>40) return text;
   const {createWorker}=await import('tesseract.js');
   const worker=await createWorker('eng',1,{logger:m=>onProgress?.(`OCR ${Math.round((m.progress||0)*100)}%`)});
   try{
@@ -155,12 +155,12 @@ async function readPdf(file,onProgress) {
       const result=await worker.recognize(canvas);
       pages.push(result.data.text);
     }
-    return pages.join('\\n');
+    return pages.join('\n');
   }finally{await worker.terminate();}
 }
 export async function extractTimetable(file,onProgress) {
   const name=file.name.toLowerCase();let rows=[];
-  if(/\\.(csv|xlsx|xls|ods)$/i.test(name)){
+  if(/\.(csv|xlsx|xls|ods)$/i.test(name)){
     const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
     for(const sheetName of wb.SheetNames){
       const matrix=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:'',raw:false});
@@ -178,7 +178,7 @@ export async function extractTimetable(file,onProgress) {
     if(!rows.length)rows=parseText(doc.documentElement.textContent||'');
   }else if(name.endsWith('.pdf')){
     rows=parseText(await readPdf(file,onProgress));
-  }else if(/\\.(png|jpe?g|webp|bmp)$/i.test(name)){
+  }else if(/\.(png|jpe?g|webp|bmp)$/i.test(name)){
     const {createWorker}=await import('tesseract.js');
     const worker=await createWorker('eng',1,{logger:m=>onProgress?.(`OCR ${Math.round((m.progress||0)*100)}%`)});
     try{
