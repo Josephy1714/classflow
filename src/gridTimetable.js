@@ -33,13 +33,14 @@ function clusterPositions(values, tolerance=2) {
   return groups.map(g=>Math.round(g.values.reduce((a,b)=>a+b,0)/g.values.length));
 }
 function lineGroups(words) {
-  const valid=(words||[]).filter(w=>w.text && w.bbox).map(w=>({
-    text:String(w.text).trim(), x0:w.bbox.x0, x1:w.bbox.x1, y0:w.bbox.y0, y1:w.bbox.y1,
-    x:(w.bbox.x0+w.bbox.x1)/2, y:(w.bbox.y0+w.bbox.y1)/2,
-    h:Math.max(1,w.bbox.y1-w.bbox.y0)
+  const candidates=(words||[]).filter(w=>w.text&&w.bbox).map(w=>({
+    text:String(w.text).trim(),x0:w.bbox.x0,x1:w.bbox.x1,y0:w.bbox.y0,y1:w.bbox.y1,
+    x:(w.bbox.x0+w.bbox.x1)/2,y:(w.bbox.y0+w.bbox.y1)/2,
+    h:Math.max(0,w.bbox.y1-w.bbox.y0)
   }));
-  const heights=valid.map(w=>w.h).sort((a,b)=>a-b);
-  const tolerance=Math.max(4,(heights[Math.floor(heights.length/2)]||10)*0.75);
+  const typicalHeight=median(candidates.map(w=>w.h).filter(h=>h>=3&&h<=80))||10;
+  const valid=candidates.filter(w=>w.h>=3&&w.h<=Math.max(30,typicalHeight*2.5)&&/[a-z0-9]/i.test(w.text));
+  const tolerance=Math.max(4,typicalHeight*0.75);
   const lines=[];
   for (const word of valid.sort((a,b)=>a.y-b.y||a.x-b.x)) {
     let line=lines.find(item=>Math.abs(item.y-word.y)<=tolerance);
