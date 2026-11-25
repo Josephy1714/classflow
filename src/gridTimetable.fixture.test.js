@@ -47,8 +47,9 @@ test('OCR reads the uploaded timetable and recovers its 11 class blocks',()=>{
   const enhancedBody=enhancedWords.filter(word=>!isAnchor(word));
   const fallback=standardWords.filter(word=>!isAnchor(word)&&word.bbox&&!enhancedBody.some(candidate=>boxesOverlap(word.bbox,candidate.bbox)));
   const words=[...standardWords.filter(isAnchor),...enhancedBody,...fallback];
-  const rows=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words});
-  console.log('OCR timetable rows:',JSON.stringify(rows));
+  const diagnostic=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words,debug:true});
+  const rows=diagnostic.rows;
+  console.log('OCR timetable debug:',JSON.stringify({rows,columns:diagnostic.columns,boundaries:diagnostic.boundaries,slots:diagnostic.slots,words:words.map(w=>({text:w.text,x:Math.round((w.bbox.x0+w.bbox.x1)/2),y:Math.round((w.bbox.y0+w.bbox.y1)/2)}))}));
   assert.equal(rows.length,11,JSON.stringify({words:words.length,rows},null,2));
   assert.deepEqual(rows.map(r=>[r.day,r.start,r.end]).sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1])),[
     [0,'08:00','10:00'],[0,'10:00','12:00'],[0,'13:00','14:00'],
