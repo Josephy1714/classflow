@@ -8,7 +8,7 @@ test('detects sessions in the uploaded real timetable grid geometry',()=>{
   const bytes=fs.readFileSync(new URL('../test-fixtures/IMG-20260906-WA0006(4).jpg',import.meta.url));
   const decoded=jpeg.decode(bytes,{useTArray:true});
   const words=[];
-  const sx=decoded.width/1219,sy=decoded.height/1600;
+  const sx=decoded.width/1072,sy=decoded.height/1408;
   const addLine=(text,x,y)=>{
     let cursor=x;
     for(const token of text.split(/\s+/)){
