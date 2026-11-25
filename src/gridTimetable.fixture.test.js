@@ -9,7 +9,9 @@ import {parseGridTimetable,detectGrid} from './gridTimetable.js';
 test('OCR reads the uploaded timetable and recovers its 11 class blocks',()=>{
   const file=new URL('../test-fixtures/IMG-20260906-WA0006(4).jpg',import.meta.url);
   const decoded=jpeg.decode(fs.readFileSync(file),{useTArray:true});
-  const tsv=execFileSync('tesseract',[file.pathname,'stdout','tsv'],{encoding:'utf8',maxBuffer:8*1024*1024});
+  const outputBase='/tmp/classflow-timetable-ocr';
+  execFileSync('tesseract',[file.pathname,outputBase,'tsv'],{maxBuffer:8*1024*1024});
+  const tsv=fs.readFileSync(outputBase+'.tsv','utf8');
   const words=tsv.split(/\\r?\\n/).slice(1).flatMap(line=>{
     const c=line.split('\\t');
     if(c.length<12||c[0]!=='5'||!c[11]?.trim()||Number(c[10])<18)return [];
