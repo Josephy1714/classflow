@@ -199,6 +199,45 @@ function groupPdfItems(items) {
   }
   return lines.sort((a,b)=>b.y-a.y).map(l=>l.items.sort((a,b)=>a.x-b.x).map(x=>x.text).join('   '));
 }
+function preprocessForOcr(source,scale=2) {
+  const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
+  canvas.width=source.width*scale;canvas.height=source.height*scale;
+  ctx.imageSmoothingEnabled=true;
+  ctx.drawImage(source,0,0,canvas.width,canvas.height);
+  const image=ctx.getImageData(0,0,canvas.width,canvas.height);
+  for(let i=0;i<image.data.length;i+=4){
+    const gray=0.2126*image.data[i]+0.7152*image.data[i+1]+0.0722*image.data[i+2];
+    const value=gray<140?0:255;
+    image.data[i]=value;image.data[i+1]=value;image.data[i+2]=value;image.data[i+3]=255;
+  }
+  ctx.putImageData(image,0,0);
+  return canvas;
+}
+function isAnchorOcrWord(value='') {
+  const text=String(value).trim();
+  return Boolean(inferWeekday(text))||/\\d{1,2}[:.]\\d{2}/i.test(text)||/^(am|pm|noon|midnight)$/i.test(text);
+}
+function scaleOcrWords(words,scale=1) {
+  return (words||[]).flatMap(word=>{
+    const b=word.bbox;
+    if(!b)return [];
+    return [{...word,bbox:{x0:b.x0/scale,y0:b.y0/scale,x1:b.x1/scale,y1:b.y1/scale}}];
+  });
+}
+async function recognizeTimetable(worker,source) {
+  const standard=await worker.recognize(source);
+  const enhancedCanvas=preprocessForOcr(source,2);
+  let enhanced;
+  try {
+    await worker.setParameters({tessedit_pageseg_mode:'11'});
+    enhanced=await worker.recognize(enhancedCanvas);
+  } finally {
+    await worker.setParameters({tessedit_pageseg_mode:'3'});
+  }
+  const anchors=standard.data.words.filter(word=>isAnchorOcrWord(word.text));
+  const body=scaleOcrWords(enhanced.data.words,2).filter(word=>!isAnchorOcrWord(word.text));
+  return {words:[...anchors,...body],text:standard.data.text};
+}
 async function readPdf(file,onProgress) {
   const doc=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
   const {createWorker}=await import('tesseract.js');
@@ -210,9 +249,9 @@ async function readPdf(file,onProgress) {
       const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
       canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
       await page.render({canvasContext:ctx,viewport}).promise;
-      const result=await worker.recognize(canvas);
-      const gridRows=parseGridTimetable({imageData:ctx.getImageData(0,0,canvas.width,canvas.height),width:canvas.width,height:canvas.height,words:result.data.words});
-      rows.push(...(gridRows.length?gridRows:parseSpatialWords(result.data.words)));
+      const result=await recognizeTimetable(worker,canvas);
+      const gridRows=parseGridTimetable({imageData:ctx.getImageData(0,0,canvas.width,canvas.height),width:canvas.width,height:canvas.height,words:result.words});
+      rows.push(...(gridRows.length?gridRows:parseSpatialWords(result.words)));
       onProgress?.(`Reading timetable page ${p} of ${doc.numPages}`);
     }
   } finally { await worker.terminate(); }
@@ -248,14 +287,14 @@ export async function extractTimetable(file,onProgress) {
     const {createWorker}=await import('tesseract.js');
     const worker=await createWorker('eng',1,{logger:m=>onProgress?.(`OCR ${Math.round((m.progress||0)*100)}%`)});
     try{
-      const result=await worker.recognize(file);
       const bitmap=await createImageBitmap(file);
       const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
       canvas.width=bitmap.width;canvas.height=bitmap.height;
       ctx.drawImage(bitmap,0,0);
-      const gridRows=parseGridTimetable({imageData:ctx.getImageData(0,0,canvas.width,canvas.height),width:canvas.width,height:canvas.height,words:result.data.words});
-      rows=gridRows.length?gridRows:parseSpatialWords(result.data.words);
-      if(!rows.length) rows=parseText(result.data.text);
+      const result=await recognizeTimetable(worker,canvas);
+      const gridRows=parseGridTimetable({imageData:ctx.getImageData(0,0,canvas.width,canvas.height),width:canvas.width,height:canvas.height,words:result.words});
+      rows=gridRows.length?gridRows:parseSpatialWords(result.words);
+      if(!rows.length) rows=parseText(result.text);
       bitmap.close?.();
     }finally{await worker.terminate();}
   }else throw new Error('Supported formats: PDF, PNG, JPG, WEBP, CSV, XLSX, XLS, ODS and ODT.');
