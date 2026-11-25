@@ -198,9 +198,9 @@ async function readPdf(file,onProgress) {
       canvas.width=viewport.width;canvas.height=viewport.height;
       await page.render({canvasContext:ctx,viewport}).promise;
       const result=await worker.recognize(canvas);
-      pages.push(result.data.text);
+      pages.push(parseSpatialWords(result.data.words));
     }
-    return pages.join('\n');
+    return pages.flat();
   }finally{await worker.terminate();}
 }
 export async function extractTimetable(file,onProgress) {
@@ -222,14 +222,14 @@ export async function extractTimetable(file,onProgress) {
     }
     if(!rows.length)rows=parseText(doc.documentElement.textContent||'');
   }else if(name.endsWith('.pdf')){
-    rows=await readPdf(file,onProgress);
+    {const pdfResult=await readPdf(file,onProgress);rows=Array.isArray(pdfResult)?pdfResult:parseText(pdfResult);}
   }else if(/\.(png|jpe?g|webp|bmp)$/i.test(name)){
     const {createWorker}=await import('tesseract.js');
     const worker=await createWorker('eng',1,{logger:m=>onProgress?.(`OCR ${Math.round((m.progress||0)*100)}%`)});
     try{
       const result=await worker.recognize(file);
       // Preserve OCR line boundaries; do not collapse the table into a paragraph.
-      rows=parseText(result.data.text);
+      rows=parseSpatialWords(result.data.words);\n      if(!rows.length) rows=parseText(result.data.text);
     }finally{await worker.terminate();}
   }else throw new Error('Supported formats: PDF, PNG, JPG, WEBP, CSV, XLSX, XLS, ODS and ODT.');
   rows=dedupe(rows);
