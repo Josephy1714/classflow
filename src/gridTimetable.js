@@ -152,21 +152,41 @@ export function parseGridTimetable({imageData,width,height,words}) {
     const index=grid.vertical.findIndex((x,i)=>mark.x>x&&mark.x<grid.vertical[i+1]);
     return index>=1&&index<grid.vertical.length-1?{...mark,left:grid.vertical[index],right:grid.vertical[index+1]}:null;
   }).filter(Boolean);
-  const timeAnchors=[];
+  const rawAnchors=[];
   for(const line of lines){
     if(!line.words.some(w=>w.x<grid.vertical[1]))continue;
     const minutes=clockMinutes(line.text);
     if(minutes===null)continue;
-    const yIndex=grid.horizontal.reduce((best,y,i)=>Math.abs(y-line.y)<Math.abs(grid.horizontal[best]-line.y)?i:best,0);
-    timeAnchors.push({index:yIndex,minutes});
+    rawAnchors.push({y:line.y,minutes});
   }
-  const boundaryTimes=interpolateAnchors(grid.horizontal,timeAnchors);
+  if(rawAnchors.length<2)return [];
+  // OCR time labels sit just below their corresponding horizontal boundary.
+  // Use their own baselines as anchors and reconstruct missing half-hour rules
+  // between hourly labels (merged cells can erase those rules in the day area).
+  const fontHeight=median(lines.flatMap(line=>line.words.map(w=>w.h)));
+  const anchored=rawAnchors.map(a=>({...a,y:a.y-fontHeight}));
+  const gaps=grid.horizontal.slice(1).map((y,i)=>y-grid.horizontal[i]).filter(d=>d>=20&&d<=110);
+  const slotHeight=median(gaps);
+  const inferred=[];
+  for(let i=0;i<anchored.length-1;i++){
+    const a=anchored[i],b=anchored[i+1],distance=b.y-a.y;
+    const intervals=Math.round(distance/slotHeight);
+    if(intervals>1&&intervals<=8){
+      for(let k=1;k<intervals;k++)inferred.push(a.y+distance*k/intervals);
+    }
+  }
+  const boundaries=clusterPositions([...grid.horizontal,...anchored.map(a=>a.y),...inferred],Math.max(8,fontHeight*0.8));
+  const timeAnchors=anchored.map(a=>({
+    index:boundaries.reduce((best,y,i)=>Math.abs(y-a.y)<Math.abs(boundaries[best]-a.y)?i:best,0),
+    minutes:a.minutes
+  }));
+  const boundaryTimes=interpolateAnchors(boundaries,timeAnchors);
   if(!boundaryTimes)return [];
   const results=[];
   for(const column of dayColumns){
     const slots=[];
-    for(let r=0;r<grid.horizontal.length-1;r++){
-      const top=grid.horizontal[r],bottom=grid.horizontal[r+1];
+    for(let r=0;r<boundaries.length-1;r++){
+      const top=boundaries[r],bottom=boundaries[r+1];
       const samples=cellSamples(data,width,column.left,column.right,top,bottom);
       const occupied=median(samples)<249;
       const headerY=Math.min(bottom-2,top+Math.max(4,(bottom-top)*0.12));
