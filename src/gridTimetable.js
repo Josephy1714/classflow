@@ -175,7 +175,7 @@ export function parseGridTimetable({imageData,width,height,words}) {
       for(let k=1;k<intervals;k++)inferred.push(a.y+distance*k/intervals);
     }
   }
-  const boundaries=clusterPositions([...grid.horizontal,...anchored.map(a=>a.y),...inferred],Math.max(8,fontHeight*0.8));
+  const boundaries=clusterPositions([...grid.horizontal,...anchored.map(a=>a.y),...inferred],Math.max(14,fontHeight*1.6));
   const timeAnchors=anchored.map(a=>({
     index:boundaries.reduce((best,y,i)=>Math.abs(y-a.y)<Math.abs(boundaries[best]-a.y)?i:best,0),
     minutes:a.minutes
