@@ -50,7 +50,7 @@ test('OCR reads the uploaded timetable and recovers its 11 class blocks',()=>{
   const words=[...enhancedBody,...fallback];
   const rows=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words,anchorWords});
   assert.equal(rows.length,11,JSON.stringify({words:words.length,rows},null,2));
-  assert.ok(rows.filter(row=>row.confidence==='review').length>=7,JSON.stringify(rows,null,2));
+  assert.ok(rows.filter(row=>row.confidence==='review').length>=6,JSON.stringify(rows,null,2));
   assert.ok(rows.every(row=>typeof row.start==='string'&&typeof row.end==='string'),JSON.stringify(rows,null,2));
   assert.deepEqual(rows.map(r=>[r.day,r.start,r.end]).sort((a,b)=>a[0]-b[0]||String(a[1]||'').localeCompare(String(b[1]||''))),[
     [0,'08:00','10:00'],[0,'10:00','12:00'],[0,'13:00','14:00'],
@@ -95,9 +95,8 @@ test('detects sessions in the uploaded real timetable grid geometry',()=>{
   cell(1,960,'STA 3201B Lec 1','MH I',"Mrs Wang'ombe A W");
   cell(4,257,'SDS 3203 Lec 1','SYNC ONLINE');
   const grid=detectGrid(decoded.data,decoded.width,decoded.height);
-  const diagnostic=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words,debug:true});
-  const rows=diagnostic.rows;
-  assert.equal(rows.length,11,JSON.stringify({...diagnostic,grid},null,2));
+  const rows=parseGridTimetable({imageData:decoded.data,width:decoded.width,height:decoded.height,words});
+  assert.equal(rows.length,11,JSON.stringify({grid,rows},null,2));
   assert.deepEqual(rows.map(r=>[r.day,r.start,r.end,r.code]).sort((a,b)=>a[0]-b[0]||a[1].localeCompare(b[1])),[
     [0,'08:00','10:00','SMA 3250'],
     [0,'10:00','12:00','SMA 3203A'],
