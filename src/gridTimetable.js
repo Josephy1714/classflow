@@ -132,16 +132,14 @@ export function parseGridTimetable({imageData,width,height,words}) {
   if(!grid)return [];
   const lines=lineGroups(words);
   if(!lines.length)return [];
-  const dayHeaders=lines.flatMap(line=>{
-    const day=inferWeekday(line.text);
-    if(!day)return [];
-    const word=line.words.find(w=>inferWeekday(w.text))||line.words[0];
-    return [{day,x:word.x,y:line.y}];
-  });
+  const dayHeaders=lines.flatMap(line=>line.words.flatMap(word=>{
+    const day=inferWeekday(word.text);
+    return day?[{day,x:word.x,y:word.y}]:[];
+  }));
   if(dayHeaders.length<2)return [];
   const dayColumns=dayHeaders.map(mark=>{
     const index=grid.vertical.findIndex((x,i)=>mark.x>x&&mark.x<grid.vertical[i+1]);
-    return index>=1&&index<grid.vertical.length-2?{...mark,left:grid.vertical[index],right:grid.vertical[index+1]}:null;
+    return index>=1&&index<grid.vertical.length-1?{...mark,left:grid.vertical[index],right:grid.vertical[index+1]}:null;
   }).filter(Boolean);
   const timeAnchors=[];
   for(const line of lines){
