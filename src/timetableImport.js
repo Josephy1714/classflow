@@ -180,27 +180,34 @@ function groupPdfItems(items) {
 }
 async function readPdf(file,onProgress) {
   const doc=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
-  let pages=[];
+  const positioned=[];
   for(let p=1;p<=doc.numPages;p++){
     const page=await doc.getPage(p), content=await page.getTextContent();
-    pages.push(groupPdfItems(content.items).join('\n'));
+    for(const item of content.items||[]){
+      if(!item.str?.trim()) continue;
+      const x=item.transform?.[4]||0, y=item.transform?.[5]||0;
+      const h=Math.abs(item.transform?.[3]||10), w=Math.max(1,item.width||item.str.length*5);
+      positioned.push({text:item.str,x0:x,x1:x+w,y0:y-h,y1:y,confidence:100});
+    }
     onProgress?.(`Reading PDF page ${p} of ${doc.numPages}`);
   }
-  let text=pages.join('\n');
-  if(text.replace(/\s/g,'').length>40) return text;
+  // Use actual PDF text coordinates first; unlike flattened text, this preserves table columns.
+  let rows=parseSpatialWords(positioned);
+  if(rows.length) return rows;
+  // OCR even when a PDF contains selectable text: some PDFs have headers/text but the timetable itself is an image.
   const {createWorker}=await import('tesseract.js');
   const worker=await createWorker('eng',1,{logger:m=>onProgress?.(`OCR ${Math.round((m.progress||0)*100)}%`)});
   try{
-    pages=[];
+    const all=[];
     for(let p=1;p<=doc.numPages;p++){
       const page=await doc.getPage(p), viewport=page.getViewport({scale:2});
       const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
       canvas.width=viewport.width;canvas.height=viewport.height;
       await page.render({canvasContext:ctx,viewport}).promise;
       const result=await worker.recognize(canvas);
-      pages.push(parseSpatialWords(result.data.words));
+      all.push(...parseSpatialWords(result.data.words));
     }
-    return pages.flat();
+    return all;
   }finally{await worker.terminate();}
 }
 export async function extractTimetable(file,onProgress) {
