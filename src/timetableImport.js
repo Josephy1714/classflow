@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
+import {parseGridTimetable, inferWeekday} from './gridTimetable.js';
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const normalize = (s='') => String(s).toLowerCase().replace(/\s+/g,' ').trim();
@@ -21,19 +22,7 @@ function parseTimePair(text) {
   const values=parseTimes(text);
   return values.length>=2 ? [values[0],values[1]] : null;
 }
-function inferDay(text) {
-  const t=normalize(text);
-  const match=t.match(/\\b(mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday|rsday)?|thursday|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\\b/i);
-  if(!match)return null;
-  const key=match[1].toLowerCase();
-  if(key.startsWith('mon'))return 'Monday';
-  if(key.startsWith('tue'))return 'Tuesday';
-  if(key.startsWith('wed'))return 'Wednesday';
-  if(key.startsWith('thu'))return 'Thursday';
-  if(key.startsWith('fri'))return 'Friday';
-  if(key.startsWith('sat'))return 'Saturday';
-  return 'Sunday';
-}
+function inferDay(text) { return inferWeekday(text); }
 function cleanCell(value) {
   return String(value??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim();
 }
@@ -212,40 +201,28 @@ function groupPdfItems(items) {
 }
 async function readPdf(file,onProgress) {
   const doc=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
-  const positioned=[];
-  for(let p=1;p<=doc.numPages;p++){
-    const page=await doc.getPage(p), content=await page.getTextContent();
-    for(const item of content.items||[]){
-      if(!item.str?.trim()) continue;
-      const x=item.transform?.[4]||0, y=item.transform?.[5]||0;
-      const h=Math.abs(item.transform?.[3]||10), w=Math.max(1,item.width||item.str.length*5);
-      positioned.push({text:item.str,x0:x,x1:x+w,y0:y-h,y1:y,confidence:100});
-    }
-    onProgress?.(`Reading PDF page ${p} of ${doc.numPages}`);
-  }
-  // Use actual PDF text coordinates first; unlike flattened text, this preserves table columns.
-  let rows=parseSpatialWords(positioned);
-  if(rows.length) return rows;
-  // Preserve extracted PDF line structure as a secondary fallback before OCR.
-  const pdfLines=[];
-  for(let p=1;p<=doc.numPages;p++){const page=await doc.getPage(p),content=await page.getTextContent();pdfLines.push(...groupPdfItems(content.items));}
-  const textFallback=parseText(pdfLines.join('\n'));
-  if(textFallback.length) return textFallback;
-  // OCR even when a PDF contains selectable text: some PDFs have headers/text but the timetable itself is an image.
   const {createWorker}=await import('tesseract.js');
   const worker=await createWorker('eng',1,{logger:m=>onProgress?.(`OCR ${Math.round((m.progress||0)*100)}%`)});
-  try{
-    const all=[];
+  const rows=[];
+  try {
     for(let p=1;p<=doc.numPages;p++){
-      const page=await doc.getPage(p), viewport=page.getViewport({scale:2});
+      const page=await doc.getPage(p),viewport=page.getViewport({scale:2});
       const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
-      canvas.width=viewport.width;canvas.height=viewport.height;
+      canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
       await page.render({canvasContext:ctx,viewport}).promise;
       const result=await worker.recognize(canvas);
-      all.push(...parseSpatialWords(result.data.words));
+      const gridRows=parseGridTimetable({imageData:ctx.getImageData(0,0,canvas.width,canvas.height),width:canvas.width,height:canvas.height,words:result.data.words});
+      rows.push(...(gridRows.length?gridRows:parseSpatialWords(result.data.words)));
+      onProgress?.(`Reading timetable page ${p} of ${doc.numPages}`);
     }
-    return all;
-  }finally{await worker.terminate();}
+  } finally { await worker.terminate(); }
+  if(rows.length)return dedupe(rows);
+  const textPages=[];
+  for(let p=1;p<=doc.numPages;p++){
+    const page=await doc.getPage(p),content=await page.getTextContent();
+    textPages.push(groupPdfItems(content.items).join('\n'));
+  }
+  return parseText(textPages.join('\n'));
 }
 export async function extractTimetable(file,onProgress) {
   const name=file.name.toLowerCase();let rows=[];
@@ -272,9 +249,14 @@ export async function extractTimetable(file,onProgress) {
     const worker=await createWorker('eng',1,{logger:m=>onProgress?.(`OCR ${Math.round((m.progress||0)*100)}%`)});
     try{
       const result=await worker.recognize(file);
-      // Preserve OCR line boundaries; do not collapse the table into a paragraph.
-      rows=parseSpatialWords(result.data.words);
+      const bitmap=await createImageBitmap(file);
+      const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+      canvas.width=bitmap.width;canvas.height=bitmap.height;
+      ctx.drawImage(bitmap,0,0);
+      const gridRows=parseGridTimetable({imageData:ctx.getImageData(0,0,canvas.width,canvas.height),width:canvas.width,height:canvas.height,words:result.data.words});
+      rows=gridRows.length?gridRows:parseSpatialWords(result.data.words);
       if(!rows.length) rows=parseText(result.data.text);
+      bitmap.close?.();
     }finally{await worker.terminate();}
   }else throw new Error('Supported formats: PDF, PNG, JPG, WEBP, CSV, XLSX, XLS, ODS and ODT.');
   rows=dedupe(rows);
