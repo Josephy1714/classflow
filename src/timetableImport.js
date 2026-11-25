@@ -1,6 +1,11 @@
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
 import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+// Bundle the matching PDF.js worker with the app instead of relying on PDF.js
+// to discover a worker URL at runtime (which can silently fall back/fail on Vercel).
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 import {parseGridTimetable, inferWeekday} from './gridTimetable.js';
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
